@@ -1027,6 +1027,7 @@ final class WorkoutViewModel {
 
     var isQuickWinActive: Bool = false
     var quickWinIndex: Int = 0
+    private var quickWinStartedAt: Date = Date()
 
     var hasTrainedToday: Bool {
         StreakCalculator.hasTrainedToday(history: history)
@@ -1040,8 +1041,9 @@ final class WorkoutViewModel {
     var streakSafeToday: Bool { hasTrainedToday || hasQuickWinToday }
 
     func startQuickWin() {
-        quickWinIndex   = 0
-        isQuickWinActive = true
+        quickWinIndex     = 0
+        quickWinStartedAt = Date()
+        isQuickWinActive  = true
     }
 
     func advanceQuickWin() {
@@ -1067,15 +1069,37 @@ final class WorkoutViewModel {
             return
         }
 
+        let now = Date()
+
+        // Streak marker — WorkoutHistory is the lightweight record the
+        // streak calculator reads from.
         let marker = WorkoutHistory(
             exerciseName: "Quick Win",
-            completedAt: Date(),
+            completedAt: now,
             sets: 0, reps: 0,
             isQuickWin: true
         )
         context.insert(marker)
+
+        // SessionHistory is the separate, richer record the History tab
+        // actually displays — without this, a completed Quick Win kept the
+        // streak alive but was invisible in History. results stays empty
+        // deliberately: Quick Win's stretches aren't real Exercise records,
+        // so synthesizing SessionExerciseResults for them would pollute
+        // per-exercise analytics (Personal Bests, weekly volume) with
+        // fake 0-rep entries.
+        let session = SessionHistory(
+            routineName: "Quick Win",
+            startedAt: quickWinStartedAt,
+            completedAt: now,
+            wasCompleted: true,
+            results: []
+        )
+        context.insert(session)
+
         saveContext()
         fetchHistory()
+        fetchSessionHistory()
         calculateStreak()
         writeWidgetSnapshot()
         rescheduleHabitNudge()
