@@ -491,8 +491,16 @@ final class WorkoutViewModel {
     /// if the routine's since been renamed or deleted this is simply nil
     /// rather than a new failure mode.
     var lastCompletedRoutine: WorkoutRoutine? {
-        guard let last = sessionHistory.first(where: { $0.wasCompleted }) else { return nil }
-        return routines.first(where: { $0.name == last.routineName })
+        // Walk newest-first and take the first completed session that maps
+        // to a routine that still exists. Skips Quick Win entries (which
+        // have no routine behind them) and sessions whose routine has since
+        // been renamed or deleted, rather than giving up at the newest one.
+        for session in sessionHistory where session.wasCompleted {
+            if let routine = routines.first(where: { $0.name == session.routineName }) {
+                return routine
+            }
+        }
+        return nil
     }
 
     /// Starts a fresh session using the same routine as the most recent
